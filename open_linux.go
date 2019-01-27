@@ -9,7 +9,7 @@ import (
 // openBrowser opens a browser for url.
 func openBrowser(url string) error {
 	log.Println("attempting to open a browser for ", url)
-	cmd := exec.Command("xdg-go", url) // linux
+	cmd := exec.Command("xdg-open", url) // linux
 	err := cmd.Run()
 	if err != nil {
 		log.Printf("failed to open browser for %s: %v", url, err)
