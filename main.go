@@ -15,7 +15,6 @@ import (
 	"os"
 	"os/exec"
 	"os/signal"
-	"runtime"
 )
 
 // envGodocPort ("GODOC_HTTP_PORT") is the envar used to override the
@@ -69,9 +68,6 @@ func init() {
 }
 
 func main() {
-	if runtime.GOOS != "darwin" {
-		exitOnErr(fmt.Errorf("gohdoc only works on macOS"))
-	}
 
 	flag.Parse()
 
