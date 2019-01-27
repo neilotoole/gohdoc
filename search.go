@@ -3,9 +3,12 @@ package main
 import (
 	"flag"
 	"fmt"
+	"io"
 	"os"
 	"sort"
 	"strings"
+
+	"github.com/PuerkitoBio/goquery"
 )
 
 // cmdList lists all pkgs on the godoc http server
@@ -122,4 +125,32 @@ func getPkgMatches(pkgs []string, s string) []string {
 
 	return matches
 
+}
+
+// scrapePkgPage scrapes the /pkg HTML, returning all pkg
+// names listed on that page.
+func scrapePkgPage(r io.Reader) ([]string, error) {
+	doc, err := goquery.NewDocumentFromReader(r)
+	if err != nil {
+		return nil, err
+	}
+
+	var pkgs []string
+
+	selector := ".pkg-dir td.pkg-name a[href]"
+
+	doc.Find(selector).Each(func(_ int, s *goquery.Selection) {
+
+		v, ok := s.Attr("href")
+		if ok {
+			// The link looks like "encoding/json/"
+			if strings.HasSuffix(v, "/") {
+				// Get rid of the trailing slash
+				v = v[0 : len(v)-1]
+			}
+			pkgs = append(pkgs, v)
+		}
+	})
+
+	return pkgs, nil
 }
