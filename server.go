@@ -92,12 +92,12 @@ func startServer(ctx context.Context) (*exec.Cmd, error) {
 	var cmd *exec.Cmd
 	flagDebug = false // TODO: get rid of this line, or introduce -vv flag
 	if flagDebug {
-		cmd = exec.CommandContext(ctx, "godoc", fmt.Sprintf("-http=:%d", port), "-v", "-index_throttle=0.5")
+		cmd = exec.CommandContext(ctx, "godoc", fmt.Sprintf("-http=:%d", port), "-v", "-index", "-index_throttle=0.5")
 		cmd.Stdout = os.Stdout
 		cmd.Stderr = os.Stderr
 
 	} else {
-		cmd = exec.CommandContext(ctx, "godoc", fmt.Sprintf("-http=:%d", port), "-index_throttle=0.5")
+		cmd = exec.CommandContext(ctx, "godoc", fmt.Sprintf("-http=:%d", port), "-index", "-index_throttle=0.5")
 	}
 
 	err := cmd.Start()

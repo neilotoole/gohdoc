@@ -1,8 +1,11 @@
 package main
 
 import (
+	"bytes"
+	"errors"
 	"flag"
 	"fmt"
+	"io"
 	"log"
 	"net/http"
 	"os"
@@ -117,7 +120,13 @@ func cmdOpen() error {
 		// Alternative strategy for args such as "bytes" or "crypto/dsa"
 
 		log.Printf("will attempt to search for %q", *originalArg)
-		pkgList, err := extractPkgList()
+
+		r, err := getPkgPageBodyReader()
+		if err != nil {
+			return err
+		}
+
+		pkgList, err := scrapePkgPage(r)
 		if err != nil {
 			return err
 		}
@@ -154,4 +163,11 @@ func cmdOpen() error {
 	}
 
 	return fmt.Errorf("got %s from %s", resp.Status, pageURL)
+}
+
+func getPkgPageBodyReader() (io.Reader, error) {
+	if len(pkgPageBody) == 0 {
+		return nil, errors.New("apparently no data from godoc http server /pkg")
+	}
+	return bytes.NewReader(pkgPageBody), nil
 }

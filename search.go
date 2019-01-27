@@ -15,7 +15,12 @@ func cmdList() error {
 		return err
 	}
 
-	pkgs, err := extractPkgList()
+	r, err := getPkgPageBodyReader()
+	if err != nil {
+		return err
+	}
+
+	pkgs, err := scrapePkgPage(r)
 	if err != nil {
 		return err
 	}
@@ -44,7 +49,12 @@ func cmdSearch() error {
 		return err
 	}
 
-	pkgs, err := extractPkgList()
+	r, err := getPkgPageBodyReader()
+	if err != nil {
+		return err
+	}
+
+	pkgs, err := scrapePkgPage(r)
 	if err != nil {
 		return err
 	}
