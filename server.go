@@ -15,11 +15,11 @@ import (
 // starts one if not. If ensureServer returns without an error, var pkgPageBody
 // will have been set to the contents of the godoc http server's /pkg/ page.
 
-func ensureServer() (err error) {
+func ensureServer(app *App) (err error) {
 
 	serverExisted := false
 
-	pingURL := fmt.Sprintf("http://localhost:%d/pkg", port)
+	pingURL := fmt.Sprintf("http://localhost:%d/pkg", app.port)
 
 	resp, err := http.Get(pingURL)
 	if err != nil {
@@ -29,7 +29,7 @@ func ensureServer() (err error) {
 		serverExisted = true
 		log.Println("found existing godoc server at", pingURL)
 		defer resp.Body.Close()
-		pkgPageBody, err = ioutil.ReadAll(resp.Body)
+		app.pkgPageBody, err = ioutil.ReadAll(resp.Body)
 		if err != nil {
 			return fmt.Errorf("failed to read body from %s: %v", pingURL, err)
 		}
@@ -38,7 +38,7 @@ func ensureServer() (err error) {
 	if !serverExisted {
 		log.Println("no existing godoc server, will attempt to start one, which will continue to run in background after gohdoc exits")
 
-		cmd, err = startServer(ctx)
+		err = startServer(app)
 		if err != nil {
 			return err
 		}
@@ -59,7 +59,7 @@ func ensureServer() (err error) {
 			resp, err = http.Get(pingURL)
 			if err == nil {
 				if resp.StatusCode == http.StatusOK {
-					pkgPageBody, err = ioutil.ReadAll(resp.Body)
+					app.pkgPageBody, err = ioutil.ReadAll(resp.Body)
 					if err != nil {
 						return fmt.Errorf("failed to read body from %s: %v", pingURL, err)
 					}
@@ -82,30 +82,42 @@ func ensureServer() (err error) {
 	return nil
 }
 
-// didStartServer returns true if gohdoc did start a server.
-func didStartServer() bool {
-	return cmd != nil
-}
-
-// startServer starts a godoc http server.
-func startServer(ctx context.Context) (*exec.Cmd, error) {
+// startServer starts a godoc http server. On success, the app.Cmd field will
+// be set to the exec.Cmd used to start the server.
+func startServer(app *App) error {
 	var cmd *exec.Cmd
+
+	ctx := app.ctx
+	if ctx == nil {
+		ctx = context.Background()
+	}
+
+	flagDebug := app.flagDebug
 	flagDebug = false // TODO: get rid of this line, or introduce -vv flag
 	if flagDebug {
-		cmd = exec.CommandContext(ctx, "godoc", fmt.Sprintf("-http=:%d", port), "-v", "-index", "-index_throttle=0.5")
+		cmd = exec.CommandContext(ctx, "godoc", fmt.Sprintf("-http=:%d", app.port), "-v", "-index", "-index_throttle=0.5")
 		cmd.Stdout = os.Stdout
 		cmd.Stderr = os.Stderr
 
 	} else {
-		cmd = exec.CommandContext(ctx, "godoc", fmt.Sprintf("-http=:%d", port), "-index", "-index_throttle=0.5")
+		cmd = exec.CommandContext(ctx, "godoc", fmt.Sprintf("-http=:%d", app.port), "-index", "-index_throttle=0.5")
 	}
 
 	err := cmd.Start()
 	if err != nil {
-		return nil, err
+		return err
 	}
-	fmt.Printf("Started godoc server [%d] for GOPATH %s at http://localhost:%d\n", cmd.Process.Pid, gopath, port)
-	fmt.Printf("Server will continue to run in the background. Kill with: gohdoc -killall\n")
-	return cmd, nil
+	// If the cmd started successfully, assign it to the app.
+	app.cmd = cmd
 
+	fmt.Printf("Started godoc server [%d] for GOPATH %s at http://localhost:%d\n", cmd.Process.Pid, app.gopath, app.port)
+	fmt.Printf("Server will continue to run in the background. Kill with: gohdoc -killall\n\n")
+
+	return nil
+
+}
+
+// didStartServer returns true if gohdoc did start a server.
+func didStartServer(app *App) bool {
+	return app != nil && app.cmd != nil
 }

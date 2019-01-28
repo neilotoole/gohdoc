@@ -3,20 +3,17 @@ package main
 import (
 	"bytes"
 	"errors"
-	"flag"
 	"fmt"
 	"io"
 	"log"
 	"net/http"
-	"os"
 	"path"
-	"strconv"
 	"strings"
 	"time"
 )
 
 // cmdOpen is the primary functionality: it opens a browser for pkg in question.
-func cmdOpen() error {
+func cmdOpen(app *App) error {
 
 	// There are several possibilities for args passed to the program
 	// - no args                     = gohdoc .
@@ -26,58 +23,45 @@ func cmdOpen() error {
 	// - gohdoc /some/absolute/path  = passed through after path.Clean()
 	// - gohdoc more than one arg    = error
 
-	args := flag.Args()
-	var pkgPath string
+	var arg string
 	var originalArg *string
 
-	switch len(args) {
+	switch len(app.args) {
 	case 0:
 		// If no arg supplied, then assume current working directory
-		pkgPath = cwd
+		arg = app.cwd
 
 	case 1:
-		pkgPath = args[0]
-		if pkgPath == "." {
+		arg = app.args[0]
+		if arg == "." {
 			// Special case, we expand "." to cwd
-			pkgPath = cwd
+			arg = app.cwd
 		}
-		originalArg = &args[0]
+		originalArg = &app.args[0]
 	default:
-		exitOnErr(fmt.Errorf("must supply maximum one arg to gohdoc, but received [%s]", strings.Join(args, ",")))
+		return fmt.Errorf("must supply maximum one arg to gohdoc, but received [%s]", strings.Join(app.args, ","))
 	}
 
-	pkgPath = path.Clean(pkgPath)
+	pkgPath := path.Clean(arg)
 	if !path.IsAbs(pkgPath) {
-		pkgPath = path.Join(cwd, pkgPath)
+		pkgPath = path.Join(app.cwd, pkgPath)
 	}
 
 	log.Println("using pkg path:", pkgPath)
-	envar, ok := os.LookupEnv(envGodocPort)
-	if ok {
-		log.Printf("found envar %s: %s", envGodocPort, envar)
-	}
-	if ok && len(strings.TrimSpace(envar)) > 0 {
-		var err error
-		port, err = strconv.Atoi(envar)
-		if err != nil || port < 1 || port > 65536 {
-			return fmt.Errorf("%s was set, but value is invalid: %s", envGodocPort, envar)
-		}
-	}
 
-	var err error
-	err = ensureServer()
+	err := ensureServer(app)
 	if err != nil {
 		return err
 	}
 
 	// We know that the server is accessible, check that we can actually access our pkg page
-	pkg, err := determinePackage(pkgPath)
+	pkg, err := determinePackage(app.gopath, pkgPath)
 	if err != nil {
 		return err
 	}
 	log.Println("attempting pkg:", pkg)
 
-	pageURL := absPkgURL(pkg)
+	pageURL := absPkgURL(app, pkg)
 	timeout := time.Now().Add(time.Millisecond * 500)
 	var resp *http.Response
 	for {
@@ -92,7 +76,7 @@ func cmdOpen() error {
 			break
 		}
 
-		if cmd == nil {
+		if app.cmd == nil {
 			// Well, if we didn't start the server ourselves, it should
 			// already be indexed, no need to wait.
 			break
@@ -107,12 +91,7 @@ func cmdOpen() error {
 
 	if resp.StatusCode == http.StatusOK {
 		// happy path, we have our page
-		err = openBrowser(pageURL)
-		if err != nil {
-			return err
-		}
-
-		return nil
+		return openBrowser(app, pageURL)
 	}
 
 	if originalArg != nil && !path.IsAbs(*originalArg) {
@@ -121,7 +100,7 @@ func cmdOpen() error {
 
 		log.Printf("will attempt to search for %q", *originalArg)
 
-		r, err := getPkgPageBodyReader()
+		r, err := getPkgPageBodyReader(app)
 		if err != nil {
 			return err
 		}
@@ -136,14 +115,14 @@ func cmdOpen() error {
 		if len(matches) > 0 {
 			log.Printf("results: %s\n", strings.Join(matches, " "))
 			// Let's use the best match
-			u := absPkgURL(matches[0])
+			u := absPkgURL(app, matches[0])
 			resp, err := http.Head(u)
 			if err == nil && resp.StatusCode == http.StatusOK {
 				log.Printf("probable match at %s", u)
 
 				const maxPkgList = 10
 
-				err := openBrowser(u)
+				err := openBrowser(app, u)
 
 				if err == nil && len(matches) > 1 {
 					if len(matches) > maxPkgList {
@@ -154,7 +133,7 @@ func cmdOpen() error {
 					} else {
 						fmt.Printf("Found %d possible matches:\n", len(matches))
 					}
-					printPkgsWithLink(matches)
+					printPkgsWithLink(app, matches)
 				}
 
 				return err
@@ -165,9 +144,29 @@ func cmdOpen() error {
 	return fmt.Errorf("got %s from %s", resp.Status, pageURL)
 }
 
-func getPkgPageBodyReader() (io.Reader, error) {
-	if len(pkgPageBody) == 0 {
+func getPkgPageBodyReader(app *App) (io.Reader, error) {
+	if app == nil || len(app.pkgPageBody) == 0 {
 		return nil, errors.New("apparently no data from godoc http server /pkg")
 	}
-	return bytes.NewReader(pkgPageBody), nil
+	return bytes.NewReader(app.pkgPageBody), nil
+}
+
+// openBrowser opens a browser for url.
+func openBrowser(app *App, url string) error {
+	log.Println("attempting to open a browser for ", url)
+
+	cmd := newOpenBrowserCmd(url) // newOpenBrowserCmd is platform-specific
+	err := cmd.Run()
+	if err != nil {
+		log.Printf("failed to open browser for %s: %v", url, err)
+		return err
+	}
+
+	if didStartServer(app) {
+		fmt.Printf("Opening %s on GOPATH %s\n", url, app.gopath)
+	} else {
+		fmt.Printf("Opening %s on already-existing server\n", url)
+	}
+
+	return nil
 }

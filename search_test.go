@@ -47,3 +47,31 @@ func TestScrapePkgPage(t *testing.T) {
 	}
 
 }
+
+func TestDeterminePackage(t *testing.T) {
+
+	testCases := []struct {
+		gopath  string
+		dirPath string
+		wantPkg string
+		wantErr bool
+	}{
+		{"/go", "/go/src/github.com/neilotoole/gohdoc/", "github.com/neilotoole/gohdoc", false},
+		{"/go", "/go/src/github.com/neilotoole/gohdoc", "github.com/neilotoole/gohdoc", false},
+	}
+
+	for i, tc := range testCases {
+		t.Run(fmt.Sprintf("%d %s", i, tc.dirPath), func(t *testing.T) {
+
+			gotPkg, err := determinePackage(tc.gopath, tc.dirPath)
+			if (err != nil) != tc.wantErr {
+				t.Errorf("wantErr was %v, but got %v", tc.wantErr, err)
+			}
+			if gotPkg != tc.wantPkg {
+				t.Errorf("wantPkg %s but got %s", tc.wantPkg, gotPkg)
+			}
+
+		})
+	}
+
+}

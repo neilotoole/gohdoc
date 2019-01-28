@@ -1,6 +1,7 @@
 package main
 
 import (
+	"context"
 	"fmt"
 	"log"
 	"os"
@@ -11,7 +12,12 @@ import (
 
 // cmdKillAll attempts to kill running processes named "godoc" with arg "-http".
 // That is, it attempts to kill all running godoc http servers.
-func cmdKillAll() error {
+func cmdKillAll(app *App) error {
+	ctx := app.ctx
+	if ctx == nil {
+		ctx = context.Background()
+	}
+
 	ps, err := process.ProcessesWithContext(ctx)
 	if err != nil {
 		return fmt.Errorf("failed to list processes: %v", err)
