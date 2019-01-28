@@ -2,11 +2,13 @@ package main
 
 import (
 	"bytes"
+	"context"
 	"errors"
 	"fmt"
 	"io"
 	"log"
 	"net/http"
+	"os/exec"
 	"path"
 	"strings"
 	"time"
@@ -151,11 +153,15 @@ func getPkgPageBodyReader(app *App) (io.Reader, error) {
 	return bytes.NewReader(app.serverPkgPageBody), nil
 }
 
+// newOpenBrowserCmdFn is set by platform-specific go files
+var newOpenBrowserCmdFn func(ctx context.Context, url string) *exec.Cmd
+
 // openBrowser opens a browser for url.
 func openBrowser(app *App, url string) error {
 	log.Println("attempting to open a browser for ", url)
 
-	cmd := newOpenBrowserCmd(url) // newOpenBrowserCmd is platform-specific
+	//cmd := newOpenBrowserCmd(app.ctx, url) // newOpenBrowserCmd is platform-specific
+	cmd := newOpenBrowserCmdFn(app.ctx, url) // newOpenBrowserCmd is platform-specific
 	err := cmd.Run()
 	if err != nil {
 		log.Printf("failed to open browser for %s: %v", url, err)

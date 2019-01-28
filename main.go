@@ -16,8 +16,11 @@ import (
 )
 
 func main() {
-	app := newApp()
-	var err error
+	app := newDefaultApp()
+	err := initApp(app)
+	exitOnErr(app, err)
+
+	log.Printf("args: %s", strings.Join(os.Args, " "))
 
 	switch {
 	case app.flagHelp:
@@ -38,7 +41,7 @@ func main() {
 }
 
 const (
-	// envGodocPort ("GODOC_HTTP_PORT") is the envar used to override the
+	// envGodocPort is the envar used to override the
 	// default godoc http server port (6060).
 	envGodocPort = "GODOC_HTTP_PORT"
 	version      = "0.1"
@@ -74,7 +77,7 @@ use gohdoc -killall and rerun gohdoc inside the appropriate GOPATH.`
 
 // cmdHelp prints help.
 func cmdHelp() {
-	fmt.Printf("gohdoc version %s - https://github.com/neilotoole/gohdoc\n\n", version)
+	fmt.Printf("gohdoc %s - https://github.com/neilotoole/gohdoc\n\n", version)
 	fmt.Println(helpText)
 }
 
@@ -108,16 +111,25 @@ type App struct {
 	args []string
 }
 
-// newApp initializes an App.
-func newApp() *App {
-	app := &App{port: 6060}
+// newDefaultApp returns a default App instance.
+func newDefaultApp() *App {
+	app := &App{port: 6060, ctx: context.Background()}
+
+	app.gopath = os.Getenv("GOPATH")
+	if app.gopath == "" {
+		app.gopath = build.Default.GOPATH
+	}
 
 	var err error
 	app.cwd, err = os.Getwd()
 	if err != nil {
-		fmt.Fprintf(os.Stderr, "failed to get current working directory: %v\n", err)
-		os.Exit(1)
+		panic(fmt.Sprintf("failed to get current working directory: %v", err))
 	}
+	return app
+}
+
+// initApp initializes an App.
+func initApp(app *App) error {
 
 	flag.BoolVar(&app.flagHelp, "help", false, "print help")
 	flag.BoolVar(&app.flagList, "list", false, "list all pkgs from godoc http server")
@@ -137,10 +149,6 @@ func newApp() *App {
 		log.SetFlags(log.Ltime | log.Lshortfile)
 	}
 
-	app.gopath = os.Getenv("GOPATH")
-	if app.gopath == "" {
-		app.gopath = build.Default.GOPATH
-	}
 	log.Println("using GOPATH:", app.gopath)
 
 	envPortVal, ok := os.LookupEnv(envGodocPort)
@@ -148,13 +156,13 @@ func newApp() *App {
 		log.Printf("found envar %s: %s", envGodocPort, envPortVal)
 	}
 	if ok && len(strings.TrimSpace(envPortVal)) > 0 {
+		var err error
 		app.port, err = strconv.Atoi(envPortVal)
 		if err != nil || app.port < 1 || app.port > 65535 {
-			exitOnErr(app, fmt.Errorf("%s was set, but value is invalid: %s", envGodocPort, envPortVal))
+			return fmt.Errorf("%s was set, but value is invalid: %s", envGodocPort, envPortVal)
 		}
 	}
 
-	app.ctx = context.Background()
 	var cancelFn context.CancelFunc
 	app.ctx, cancelFn = context.WithCancel(app.ctx)
 
@@ -169,19 +177,14 @@ func newApp() *App {
 			app.cmd.Process.Kill()
 		}
 	}()
-
-	return app
-
+	return nil
 }
 
 // exitOnErr prints err info and calls os.Exit(1) if err is not nil.
 func exitOnErr(app *App, err error) {
-	if app == nil {
-		panic("app is nil")
-	}
 	if err != nil {
 		fmt.Fprintln(os.Stderr, "Error:", err)
-		if app.cmd != nil {
+		if app != nil && app.cmd != nil {
 			// If we're exiting due to an error, and we already started a godoc http server, kill it
 			log.Printf("killing the godoc http server [%d] that gohdoc started\n", app.cmd.Process.Pid)
 			_ = app.cmd.Process.Kill()

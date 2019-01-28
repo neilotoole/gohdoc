@@ -1,9 +1,22 @@
 package main
 
 import (
+	"context"
 	"os/exec"
 )
 
-func newOpenBrowserCmd(url string) *exec.Cmd {
-	return exec.Command("xdg-open", url) // linux
+import (
+	"context"
+	"os/exec"
+)
+
+func init() {
+	newOpenBrowserCmdFn = func(ctx context.Context, url string) *exec.Cmd {
+		return exec.CommandContext(ctx, "xdg-open", url) // linux
+	}
 }
+
+//func newOpenBrowserCmd(ctx context.Context, url string) *exec.Cmd {
+//
+//	return exec.CommandContext(ctx, "xdg-open", url) // linux
+//}

@@ -132,10 +132,14 @@ func listServerProcesses(ctx context.Context) ([]processMeta, error) {
 	return matches, nil
 }
 
-// ensureServer checks if there's an existing godoc http server, or
-// starts one if not. If ensureServer returns without an error, var pkgPageBody
-// will have been set to the contents of the godoc http server's /pkg/ page.
+// ensureServer checks if there's an existing godoc http server, or starts one if
+// not. If ensureServer returns without an error, app.serverPkgPageBody will have
+// been set to the contents of the godoc http server's /pkg page.
 func ensureServer(app *App) (err error) {
+	if len(app.serverPkgPageBody) > 0 {
+		// If this is already set, then we've already determined that a server exists.
+		return nil
+	}
 
 	serverExisted := false
 
@@ -149,10 +153,11 @@ func ensureServer(app *App) (err error) {
 		serverExisted = true
 		log.Println("found existing godoc server at", pingURL)
 		defer resp.Body.Close()
-		app.serverPkgPageBody, err = ioutil.ReadAll(resp.Body)
+		b, err := ioutil.ReadAll(resp.Body)
 		if err != nil {
 			return fmt.Errorf("failed to read body from %s: %v", pingURL, err)
 		}
+		app.serverPkgPageBody = b
 	}
 
 	if !serverExisted {

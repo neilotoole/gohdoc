@@ -1,9 +1,17 @@
 package main
 
 import (
+	"context"
 	"os/exec"
 )
 
-func newOpenBrowserCmd(url string) *exec.Cmd {
-	return exec.Command("open", url) // macOS
+func init() {
+	newOpenBrowserCmdFn = func(ctx context.Context, url string) *exec.Cmd {
+		return exec.CommandContext(ctx, "open", url) // macOS
+	}
 }
+
+//newOp(ctx context.Context, url string) *exec.Cmd {
+//
+//	return exec.CommandContext(ctx, "open", url) // macOS
+//}
