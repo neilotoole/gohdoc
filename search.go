@@ -14,20 +14,12 @@ import (
 
 // cmdList lists all pkgs on the godoc http server.
 func cmdList(app *App) error {
-	err := ensureServer(app)
+	err := loadServerPkgList(app)
 	if err != nil {
 		return err
 	}
 
-	r, err := getPkgPageBodyReader(app)
-	if err != nil {
-		return err
-	}
-
-	pkgs, err := scrapePkgPage(r)
-	if err != nil {
-		return err
-	}
+	pkgs := app.serverPkgList
 
 	if app.flagListv {
 		// When verbose, also print a link to the pkg
@@ -42,26 +34,16 @@ func cmdList(app *App) error {
 
 // cmdSearch lists all godoc http server packages that match the argument.
 func cmdSearch(app *App) error {
-
 	if len(app.args) != 1 {
 		return fmt.Errorf("search command takes exactly one arg")
 	}
 
-	err := ensureServer(app)
+	err := loadServerPkgList(app)
 	if err != nil {
 		return err
 	}
 
-	r, err := getPkgPageBodyReader(app)
-	if err != nil {
-		return err
-	}
-
-	pkgs, err := scrapePkgPage(r)
-	if err != nil {
-		return err
-	}
-
+	pkgs := app.serverPkgList
 	term := app.args[0]
 	log.Printf("searching %d pkg names for term %q", len(pkgs), term)
 
@@ -81,6 +63,27 @@ func cmdSearch(app *App) error {
 
 	return nil
 
+}
+
+// loadServerPkgList loads the list of pkgs from the server, and
+// sets app.serverPkgList with that data.
+func loadServerPkgList(app *App) error {
+	err := ensureServer(app)
+	if err != nil {
+		return err
+	}
+
+	r, err := getPkgPageBodyReader(app)
+	if err != nil {
+		return err
+	}
+
+	pkgs, err := scrapePkgPage(r)
+	if err != nil {
+		return err
+	}
+	app.serverPkgList = pkgs
+	return nil
 }
 
 // getPkgMatches returns the set of pkg names that match arg s,
@@ -159,24 +162,29 @@ func scrapePkgPage(r io.Reader) ([]string, error) {
 	return pkgs, nil
 }
 
-// determinePackage returns the package path of the supplied dir (relative to the GOPATH).
-// For example, the return value could be "github.com/neilotoole/gohdoc".
-func determinePackage(gopath string, dirPath string) (pkg string, err error) {
+// determinePackageOnGopath attempts to determine if the supplied dirpath
+// could be on our GOPATH, returning the pkg path relative to GOPATH.
+//
+// For example, if GOPATH is /go and dirpath is /go/src/github.com/neilotoole/gohdoc
+// then the return value would be github.com/neilotoole/gohdoc.
+//
+// TODO: change the signature to return a bool instead of error
+func determinePackage(gopath string, dirpath string) (pkg string, err error) {
 	const tpl = "dir %s does not appear to be a valid package on GOPATH %s"
 
-	dirPath = path.Clean(dirPath)
-	log.Println("using path dir:", dirPath)
+	dirpath = path.Clean(dirpath)
+	log.Println("using path dir:", dirpath)
 
 	gopathPrefix := path.Join(gopath, "src")
 
-	if !strings.HasPrefix(dirPath, gopathPrefix) || dirPath == gopathPrefix {
-		return "", fmt.Errorf(tpl, dirPath, gopath)
+	if !strings.HasPrefix(dirpath, gopathPrefix) || dirpath == gopathPrefix {
+		return "", fmt.Errorf(tpl, dirpath, gopath)
 	}
 
 	// strip out the gopath's path to just get the pkg path
-	pkg = dirPath[len(gopathPrefix)+1:]
+	pkg = dirpath[len(gopathPrefix)+1:]
 	if pkg == "" {
-		return "", fmt.Errorf(tpl, dirPath, gopath)
+		return "", fmt.Errorf(tpl, dirpath, gopath)
 	}
 	return pkg, nil
 }

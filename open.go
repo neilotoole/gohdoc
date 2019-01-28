@@ -145,10 +145,10 @@ func cmdOpen(app *App) error {
 }
 
 func getPkgPageBodyReader(app *App) (io.Reader, error) {
-	if app == nil || len(app.pkgPageBody) == 0 {
+	if app == nil || len(app.serverPkgPageBody) == 0 {
 		return nil, errors.New("apparently no data from godoc http server /pkg")
 	}
-	return bytes.NewReader(app.pkgPageBody), nil
+	return bytes.NewReader(app.serverPkgPageBody), nil
 }
 
 // openBrowser opens a browser for url.
@@ -162,7 +162,8 @@ func openBrowser(app *App, url string) error {
 		return err
 	}
 
-	if didStartServer(app) {
+	if app.cmd != nil {
+		// if non-nil, we did start a server
 		fmt.Printf("Opening %s on GOPATH %s\n", url, app.gopath)
 	} else {
 		fmt.Printf("Opening %s on already-existing server\n", url)

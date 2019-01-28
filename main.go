@@ -22,6 +22,8 @@ func main() {
 	switch {
 	case app.flagHelp:
 		cmdHelp()
+	case app.flagServers:
+		err = cmdServers(app)
 	case app.flagKillAll:
 		err = cmdKillAll(app)
 	case app.flagList, app.flagListv:
@@ -54,7 +56,8 @@ Usage:
   gohdoc ~/go/src/github.com/ksoze/myproj      open godoc in browser for pkg at this path
   gohdoc fmt                                   open godoc in browser for pkg fmt
   gohdoc -help                                 print this help message
-  gohdoc -killall                              kill any running godoc http servers
+  gohdoc -servers                              list godoc http server processes
+  gohdoc -killall                              kill all godoc http server processes
   gohdoc -list                                 list all packages on the godoc http server
   gohdoc -listv                                same as -list, but prints additional detail
   gohdoc -search pkg/name                      list packages that match arg
@@ -87,14 +90,17 @@ type App struct {
 	// cmd is the Cmd used to start a godoc http server, if necessary to do so.
 	cmd *exec.Cmd
 	ctx context.Context
-	// pkgPageBody holds the contents of the godoc http server's /pkg/ page
-	pkgPageBody []byte
+	// serverPkgPageBody holds the contents of the godoc http server's /pkg/ page
+	serverPkgPageBody []byte
+	// serverPkgList holds the list of pkgs parsed from serverPkgPageBody
+	serverPkgList []string
 
 	flagHelp    bool
 	flagList    bool
 	flagListv   bool
 	flagSearch  bool
 	flagSearchv bool
+	flagServers bool
 	flagKillAll bool
 	flagDebug   bool
 
@@ -118,7 +124,8 @@ func newApp() *App {
 	flag.BoolVar(&app.flagListv, "listv", false, "like -list but with verbose output")
 	flag.BoolVar(&app.flagSearch, "search", false, "search lists all pkgs that match pkg arg")
 	flag.BoolVar(&app.flagSearchv, "searchv", false, "like -search but with verbose output")
-	flag.BoolVar(&app.flagKillAll, "killall", false, "kill any running godoc http servers")
+	flag.BoolVar(&app.flagServers, "servers", false, "list all godoc http server processes")
+	flag.BoolVar(&app.flagKillAll, "killall", false, "kill all godoc http server processes")
 	flag.BoolVar(&app.flagDebug, "debug", false, "print debug messages")
 
 	flag.Parse()
@@ -173,10 +180,7 @@ func exitOnErr(app *App, err error) {
 		panic("app is nil")
 	}
 	if err != nil {
-		fmt.Fprintln(os.Stderr, "error:", err)
-		if app.gopath != "" {
-			fmt.Fprintln(os.Stderr, " info: was using GOPATH:", app.gopath)
-		}
+		fmt.Fprintln(os.Stderr, "Error:", err)
 		if app.cmd != nil {
 			// If we're exiting due to an error, and we already started a godoc http server, kill it
 			log.Printf("killing the godoc http server [%d] that gohdoc started\n", app.cmd.Process.Pid)
