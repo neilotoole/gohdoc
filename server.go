@@ -105,7 +105,7 @@ func listServerProcesses(ctx context.Context) ([]processMeta, error) {
 			return nil, fmt.Errorf("failed to get process [%d] name: %v", p.Pid, err)
 		}
 
-		if strings.HasPrefix(name, "godoc") == false {
+		if !strings.HasPrefix(name, "godoc") {
 			continue
 		}
 
@@ -127,7 +127,6 @@ func listServerProcesses(ctx context.Context) ([]processMeta, error) {
 				break
 			}
 		}
-
 	}
 	return matches, nil
 }
@@ -217,9 +216,7 @@ func startServer(app *App) error {
 		ctx = context.Background()
 	}
 
-	flagDebug := app.flagDebug
-	flagDebug = false // TODO: get rid of this line, or introduce -vv flag
-	if flagDebug {
+	if app.flagDebug {
 		cmd = exec.CommandContext(ctx, "godoc", fmt.Sprintf("-http=:%d", app.port), "-v", "-index", "-index_throttle=0.5")
 		cmd.Stdout = os.Stdout
 		cmd.Stderr = os.Stderr

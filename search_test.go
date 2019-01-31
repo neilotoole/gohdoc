@@ -54,24 +54,25 @@ func TestDeterminePackage(t *testing.T) {
 		gopath  string
 		dirPath string
 		wantPkg string
-		wantErr bool
+		wantOK  bool
 	}{
-		{"/go", "/go/src/github.com/neilotoole/gohdoc/", "github.com/neilotoole/gohdoc", false},
-		{"/go", "/go/src/github.com/neilotoole/gohdoc", "github.com/neilotoole/gohdoc", false},
+		{"/go", "/go/src/github.com/neilotoole/gohdoc/", "github.com/neilotoole/gohdoc", true},
+		{"/go", "/go/src/github.com/neilotoole/gohdoc", "github.com/neilotoole/gohdoc", true},
 	}
 
 	for i, tc := range testCases {
+		tc := tc
 		t.Run(fmt.Sprintf("%d %s", i, tc.dirPath), func(t *testing.T) {
 
-			gotPkg, err := determinePackage(tc.gopath, tc.dirPath)
-			if (err != nil) != tc.wantErr {
-				t.Errorf("wantErr was %v, but got %v", tc.wantErr, err)
+			gotPkg, gotOK := determinePackageOnGopath(tc.gopath, tc.dirPath)
+			if gotOK != tc.wantOK {
+				t.Errorf("wantOK=%v but gotOK=%v", tc.wantOK, gotOK)
 			}
+
 			if gotPkg != tc.wantPkg {
-				t.Errorf("wantPkg %s but got %s", tc.wantPkg, gotPkg)
+				t.Errorf("wantPkg=%s but gotPkg=%s", tc.wantPkg, gotPkg)
 			}
 
 		})
 	}
-
 }

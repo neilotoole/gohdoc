@@ -10,7 +10,3 @@ func init() {
 		return exec.CommandContext(ctx, "cmd", "/c", "start", url) // windows
 	}
 }
-
-//func newOpenBrowserCmd(ctx context.Context, url string) *exec.Cmd {
-//	return exec.CommandContext(ctx, "cmd", "/c", "start", url) // windows
-//}

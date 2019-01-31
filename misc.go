@@ -12,7 +12,7 @@ func absPkgURL(app *App, fullPkgPath string) string {
 	return fmt.Sprintf("http://localhost:%d/pkg/%s/", app.port, fullPkgPath)
 }
 
-// printPkgsWithLink will, for each pkg print a line with the pkg name and link.
+// printPkgsWithLink will - for each pkg - print a line with the pkg name and link.
 func printPkgsWithLink(app *App, pkgs []string) {
 	var width int
 	for _, m := range pkgs {
@@ -26,7 +26,3 @@ func printPkgsWithLink(app *App, pkgs []string) {
 		fmt.Printf(tpl, pkg, absPkgURL(app, pkg))
 	}
 }
-
-//func splitFragment(s string) (path, fragment string) {
-//
-//}

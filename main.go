@@ -46,7 +46,7 @@ const (
 	envGodocPort = "GODOC_HTTP_PORT"
 	version      = "0.1"
 
-	helpText = `gohdoc (go html doc) opens godoc for a pkg in the browser. gohdoc looks for an existing
+	helpText = `gohdoc (go http doc) opens godoc for a pkg in the browser. gohdoc looks for an existing
 godoc http server, and uses that if available. If not, gohdoc will start a godoc http
 server on port 6060 (port can be overridden using envar GODOC_HTTP_PORT). The godoc http
 server will continue to run after gohdoc exits, but can be killed using gohdoc -killall.
@@ -143,7 +143,7 @@ func initApp(app *App) error {
 	flag.Parse()
 	app.args = flag.Args()
 
-	if app.flagDebug == false {
+	if !app.flagDebug {
 		log.SetOutput(ioutil.Discard)
 	} else {
 		log.SetFlags(log.Ltime | log.Lshortfile)
@@ -168,13 +168,13 @@ func initApp(app *App) error {
 
 	go func() {
 		stop := make(chan os.Signal, 1)
-		signal.Notify(stop, os.Interrupt, os.Kill)
+		signal.Notify(stop, os.Interrupt)
 
 		<-stop
 		log.Println("received interrupt/kill signal")
 		cancelFn()
 		if app.cmd != nil {
-			app.cmd.Process.Kill()
+			_ = app.cmd.Process.Kill()
 		}
 	}()
 	return nil

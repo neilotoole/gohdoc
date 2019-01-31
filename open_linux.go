@@ -15,8 +15,3 @@ func init() {
 		return exec.CommandContext(ctx, "xdg-open", url) // linux
 	}
 }
-
-//func newOpenBrowserCmd(ctx context.Context, url string) *exec.Cmd {
-//
-//	return exec.CommandContext(ctx, "xdg-open", url) // linux
-//}

@@ -5,7 +5,7 @@ import (
 	"io"
 	"log"
 	"os"
-	"path"
+	"path/filepath"
 	"sort"
 	"strings"
 
@@ -47,7 +47,7 @@ func cmdSearch(app *App) error {
 	term := app.args[0]
 	log.Printf("searching %d pkg names for term %q", len(pkgs), term)
 
-	matches := getPkgMatches(pkgs, term)
+	matches, _ := getPkgMatches(pkgs, term)
 	if len(matches) == 0 {
 		fmt.Fprintf(os.Stderr, "No package found matching %s", term)
 		return nil
@@ -88,14 +88,13 @@ func loadServerPkgList(app *App) error {
 
 // getPkgMatches returns the set of pkg names that match arg s,
 // with the best match first. The "best match" algorithm is pretty trivial.
-func getPkgMatches(pkgs []string, s string) []string {
-	var matches []string
+// If there's an exact match of s against pkgs, then exactMatch is returned
+// true, and matches has minimum length 1 (although it may be larger).
+func getPkgMatches(pkgs []string, s string) (matches []string, exactMatch bool) {
 	if len(s) == 0 || len(pkgs) == 0 {
-		return matches
+		return matches, false
 	}
 
-	// exactMatch is set to true if an exact match is found
-	var exactMatch bool
 	// We match on whether s is a suffix, prefix, or is contained in pkg
 	var sufMatches, preMatches, containMatches []string
 
@@ -131,7 +130,7 @@ func getPkgMatches(pkgs []string, s string) []string {
 	matches = append(matches, preMatches...)
 	matches = append(matches, containMatches...)
 
-	return matches
+	return matches, exactMatch
 
 }
 
@@ -167,24 +166,55 @@ func scrapePkgPage(r io.Reader) ([]string, error) {
 //
 // For example, if GOPATH is /go and dirpath is /go/src/github.com/neilotoole/gohdoc
 // then the return value would be github.com/neilotoole/gohdoc.
-//
-// TODO: change the signature to return a bool instead of error
-func determinePackage(gopath string, dirpath string) (pkg string, err error) {
-	const tpl = "dir %s does not appear to be a valid package on GOPATH %s"
+func determinePackageOnGopath(gopath string, dirpath string) (pkg string, ok bool) {
+	log.Printf("determinePackage: GOPATH=%q dirpath=%q", gopath, dirpath)
 
-	dirpath = path.Clean(dirpath)
-	log.Println("using path dir:", dirpath)
+	gopath = filepath.Clean(gopath)
 
-	gopathPrefix := path.Join(gopath, "src")
+	if gopath == "" {
+		log.Println("GOPATH is empty")
+		return "", false
+	}
 
-	if !strings.HasPrefix(dirpath, gopathPrefix) || dirpath == gopathPrefix {
-		return "", fmt.Errorf(tpl, dirpath, gopath)
+	if !filepath.IsAbs(gopath) {
+		log.Println("GOPATH is not an absolute path:", gopath)
+		return "", false
+	}
+
+	gopathParts := strings.Split(gopath, string(filepath.Separator)) // this seems wrong
+	if len(gopathParts) < 1 {
+		// not planning on supporting a pathological case where GOPATH is /
+		log.Println("GOPATH is too short: ", gopath)
+		return "", false
+	}
+
+	// gopathPrefix, at a minimum, should be something like /go/src
+	gopathPrefix := filepath.Join(gopath, "src")
+
+	dirpath = filepath.Clean(dirpath)
+	// At a minimum, dirpath should be something like /go/src/mypkg
+	dirpathParts := strings.Split(dirpath, string(filepath.Separator))
+	if len(dirpathParts) < 3 {
+		log.Println("dirpath is too short:", dirpath, strings.Join(dirpathParts, " | "))
+	}
+
+	if dirpath == gopathPrefix {
+		log.Println("dirpath is at GOPATH/src, needs to be in a sub-dir", dirpath)
+		return "", false
+	}
+
+	if !strings.HasPrefix(dirpath, gopathPrefix) {
+		log.Printf("dirpath %q is not beneath GOPATH/src %q\n", dirpath, gopathPrefix)
+		return "", false
 	}
 
 	// strip out the gopath's path to just get the pkg path
 	pkg = dirpath[len(gopathPrefix)+1:]
 	if pkg == "" {
-		return "", fmt.Errorf(tpl, dirpath, gopath)
+		// probably can never reach this due to checks above
+		log.Printf("after stripping out GOPATH/src prefix %q from dirpath, empty path remaining: %s", gopathPrefix, pkg)
+		return "", false
 	}
-	return pkg, nil
+
+	return pkg, true
 }
