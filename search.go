@@ -1,6 +1,8 @@
 package main
 
 import (
+	"bytes"
+	"errors"
 	"fmt"
 	"io"
 	"log"
@@ -49,7 +51,7 @@ func cmdSearch(app *App) error {
 
 	matches, _ := getPkgMatches(pkgs, term)
 	if len(matches) == 0 {
-		fmt.Fprintf(os.Stderr, "No package found matching %s", term)
+		fmt.Fprintf(os.Stderr, "No package found matching %s\n", term)
 		return nil
 	}
 
@@ -73,10 +75,10 @@ func loadServerPkgList(app *App) error {
 		return err
 	}
 
-	r, err := getPkgPageBodyReader(app)
-	if err != nil {
-		return err
+	if app == nil || len(app.serverPkgPageBody) == 0 {
+		return errors.New("apparently no data from godoc http server /pkg")
 	}
+	r := bytes.NewReader(app.serverPkgPageBody)
 
 	pkgs, err := scrapePkgPage(r)
 	if err != nil {
@@ -165,7 +167,7 @@ func scrapePkgPage(r io.Reader) ([]string, error) {
 // could be on our GOPATH, returning the pkg path relative to GOPATH.
 //
 // For example, if GOPATH is /go and dirpath is /go/src/github.com/neilotoole/gohdoc
-// then the return value would be github.com/neilotoole/gohdoc.
+// then the return value would be: github.com/neilotoole/gohdoc
 func determinePackageOnGopath(gopath string, dirpath string) (pkg string, ok bool) {
 	log.Printf("determinePackage: GOPATH=%q dirpath=%q", gopath, dirpath)
 

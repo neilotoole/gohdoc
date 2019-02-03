@@ -107,7 +107,8 @@ type App struct {
 	flagKillAll bool
 	flagDebug   bool
 
-	// args holds the value of flag.Args after flag.Parse is invoked.
+	// args holds the processed value of flag.Args after flag.Parse is invoked.
+	// Each element of args will have whitespace trimmed and have min length of 1.
 	args []string
 }
 
@@ -141,7 +142,15 @@ func initApp(app *App) error {
 	flag.BoolVar(&app.flagDebug, "debug", false, "print debug messages")
 
 	flag.Parse()
-	app.args = flag.Args()
+
+	for _, arg := range flag.Args() {
+		// Process command line args.
+		// Each element of app.args will have whitespace trimmed and have min length of 1.
+		arg = strings.TrimSpace(arg)
+		if len(arg) > 0 {
+			app.args = append(app.args, arg)
+		}
+	}
 
 	if !app.flagDebug {
 		log.SetOutput(ioutil.Discard)

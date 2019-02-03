@@ -17,6 +17,7 @@ func TestScrapePkgPage(t *testing.T) {
 	}
 
 	for _, tc := range testCases {
+		tc := tc
 		t.Run(tc, func(t *testing.T) {
 			b, err := ioutil.ReadFile(tc)
 			if err != nil {
@@ -56,8 +57,48 @@ func TestDeterminePackage(t *testing.T) {
 		wantPkg string
 		wantOK  bool
 	}{
-		{"/go", "/go/src/github.com/neilotoole/gohdoc/", "github.com/neilotoole/gohdoc", true},
-		{"/go", "/go/src/github.com/neilotoole/gohdoc", "github.com/neilotoole/gohdoc", true},
+		{
+			"/go",
+			"/go/src/github.com/neilotoole/gohdoc/",
+			"github.com/neilotoole/gohdoc",
+			true,
+		},
+		{
+			"/go",
+			"/go/src/github.com/neilotoole/gohdoc",
+			"github.com/neilotoole/gohdoc",
+			true,
+		},
+		{
+			"/go",
+			"/go/src/github.com/neilotoole/gohdoc/sub/pkg",
+			"github.com/neilotoole/gohdoc/sub/pkg",
+			true,
+		},
+		{
+			"/go",
+			"/go/src/github.com/neilotoole/../neilotoole/./gohdoc/",
+			"github.com/neilotoole/gohdoc",
+			true,
+		},
+		{
+			"/go",
+			"/go/src/github.com/other/pkg",
+			"github.com/other/pkg",
+			true,
+		},
+		{
+			"/go",
+			"/othergo/src/github.com/neilotoole/gohdoc",
+			"",
+			false,
+		},
+		{
+			"",
+			"/go/src/github.com/neilotoole/gohdoc/",
+			"",
+			false,
+		},
 	}
 
 	for i, tc := range testCases {

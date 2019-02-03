@@ -1,14 +1,9 @@
 package main
 
 import (
-	"bytes"
-	"context"
-	"errors"
 	"fmt"
-	"io"
 	"log"
 	"net/http"
-	"os/exec"
 	"path"
 	"path/filepath"
 	"strings"
@@ -17,30 +12,8 @@ import (
 
 // cmdOpen is the primary functionality: it opens a browser for pkg in question.
 func cmdOpen(app *App) error {
-	// There are several possibilities for args passed to the program
-	// - no args                     = gohdoc .
-	// - gohdoc .                    = gohdoc CWD
-	// - gohdoc some/relative/path   = transformed to absolute path
-	// - gohdoc arbitrary/pkg        = try relative path first, then search for arbitrary/pkg
-	// - gohdoc /some/absolute/path  = passed through after path.Clean()
-	// - gohdoc more than one arg    = error
 
-	var arg string
-	var originalArg *string
-
-	switch len(app.args) {
-	case 0:
-		// If no arg supplied, then assume current working directory
-		arg = app.cwd
-
-	case 1:
-		arg = app.args[0]
-		if arg == "." {
-			// Special case, we expand "." to cwd
-			arg = app.cwd
-		}
-		originalArg = &app.args[0]
-	default:
+	if len(app.args) > 1 {
 		return fmt.Errorf("must supply maximum one arg to gohdoc, but received %d [%s]",
 			len(app.args), strings.Join(app.args, ","))
 	}
@@ -54,6 +27,101 @@ func cmdOpen(app *App) error {
 		return err
 	}
 	// At this point, we know that the server is available, and app.serverPkgList is populated.
+	return doOpen(app, openBrowser)
+
+}
+
+// processCmdOpenArgs processes the command line args.
+//
+// There are several possibilities for args passed to the program
+// - no args                     = gohdoc .
+// - gohdoc .                    = gohdoc CWD
+// - gohdoc some/relative/path   = transformed to absolute path
+// - gohdoc arbitrary/pkg        = try relative path first, then search for arbitrary/pkg
+// - gohdoc /some/absolute/path  = passed through after path.Clean()
+// - gohdoc more than one arg    = error
+//
+// - gohdoc fmt#Println          = open fmt with #fragment
+// - gohdoc fmt/#Println         = same as above
+// - gohdoc #Func                = open current dir godoc with #fragment
+// - gohdoc ./#Func              = same as above
+// - gohdoc .#Func               = same as above
+func processCmdOpenArgs(app *App) (path string, pkg string, fragment *string) {
+
+	cwd := filepath.Clean(app.cwd)
+	cwdBase := filepath.Base(cwd)
+	if len(app.args) == 0 || app.args[0] == "" {
+		return app.cwd, cwdBase, nil
+	}
+
+	raw := app.args[0]
+	arg := strings.TrimSpace(raw)
+
+	if i := strings.IndexRune(arg, '#'); i >= 0 {
+		if len(arg) == 1 {
+			// i.e. arg is "#"
+			return cwd, cwdBase, nil
+		}
+
+		if i < len(arg)-2 {
+			// e.g. arg is "blah#"
+			frag := arg[i+1:]
+			fragment = &frag
+		}
+
+		if i > 0 {
+			arg = arg[0:i]
+		} else {
+			arg = ""
+		}
+	}
+
+	arg = filepath.Clean(arg)
+	if arg == "." {
+		return cwd, cwdBase, fragment
+	}
+
+	base := filepath.Base(arg)
+	if filepath.IsAbs(arg) {
+		return arg, base, fragment
+	}
+
+	// arg is not absolute
+	return filepath.Join(cwd, arg), arg, fragment
+
+}
+
+// doOpen does the main work of cmdOpen.
+func doOpen(app *App, fnOpenBrowser func(app *App, url string) error) error {
+
+	var arg string
+	var originalArg *string
+	var fragment *string
+
+	if len(app.args) == 0 || app.args[0] == "" {
+		// If no arg supplied, then assume current working directory
+		arg = app.cwd
+	} else {
+		arg = app.args[0]
+
+		if i := strings.IndexRune(arg, '#'); i >= 0 {
+			frag := arg[i:]
+			fragment = &frag
+			if i > 0 {
+				arg = arg[0 : i-1]
+			} else {
+				arg = ""
+			}
+		}
+
+		if arg == "." {
+			// Special case, we expand "." to cwd
+			arg = app.cwd
+		}
+		originalArg = &app.args[0]
+	}
+
+	log.Println("#fragment:", fragment)
 
 	tentativePkgPath := filepath.Clean(arg)
 	if !path.IsAbs(tentativePkgPath) {
@@ -71,7 +139,7 @@ func cmdOpen(app *App) error {
 			return err
 		}
 		if ok {
-			return openBrowser(app, absPkgURL(app, pkgPath))
+			return fnOpenBrowser(app, absPkgURL(app, pkgPath, nil)) // TODO: #fragment
 		}
 
 		log.Println("server doesn't have pkgPath:", pkgPath)
@@ -95,18 +163,18 @@ func cmdOpen(app *App) error {
 				return fmt.Errorf("should have been able to open this, but it seems not to exist: %s", matches[0])
 			}
 
-			return openBrowser(app, absPkgURL(app, matches[0]))
+			return fnOpenBrowser(app, absPkgURL(app, matches[0], nil)) // TODO: #fragment
 		}
 
 		// We don't have an exact match
-		for _, match := range matches[1:] {
+		for _, match := range matches {
 			ok, err := serverPkgPageOK(app, match, false)
 			if err != nil {
 				return err
 			}
 			if ok {
 				printPossibleMatches(app, arg, matches)
-				return openBrowser(app, absPkgURL(app, match))
+				return fnOpenBrowser(app, absPkgURL(app, match, nil)) // TODO: #fragment
 			}
 		}
 
@@ -138,7 +206,7 @@ func serverPkgPageOK(app *App, pkgPath string, retry bool) (ok bool, err error) 
 		return false, fmt.Errorf("invalid pkg path (has '/' prefix or suffix): %s", pkgPath)
 	}
 
-	pageURL := absPkgURL(app, pkgPath)
+	pageURL := absPkgURL(app, pkgPath, nil)
 	log.Println("serverPkgPageOK: attempting pageURL:", pageURL)
 	timeout := time.Now()
 	if retry {
@@ -165,24 +233,13 @@ func serverPkgPageOK(app *App, pkgPath string, retry bool) (ok bool, err error) 
 	return false, nil
 }
 
-func getPkgPageBodyReader(app *App) (io.Reader, error) {
-	if app == nil || len(app.serverPkgPageBody) == 0 {
-		return nil, errors.New("apparently no data from godoc http server /pkg")
-	}
-	return bytes.NewReader(app.serverPkgPageBody), nil
-}
-
-// newOpenBrowserCmdFn is set by platform-specific go files
-var newOpenBrowserCmdFn func(ctx context.Context, url string) *exec.Cmd
-
-// openBrowser opens a browser for url.
+// openBrowser opens a browser for url. It delegates creation of the platform-specific
+// exec.Cmd to build tag-gated implementations of openBrowserCmd.
 func openBrowser(app *App, url string) error {
-	log.Println("openBrowser: get rid of me") // TODO
-	defer log.Println("openBrowser: done")
 	log.Println("attempting to open a browser for:", url)
 
 	//cmd := newOpenBrowserCmd(app.ctx, url) // newOpenBrowserCmd is platform-specific
-	cmd := newOpenBrowserCmdFn(app.ctx, url) // newOpenBrowserCmd is platform-specific
+	cmd := openBrowserCmd(app.ctx, url) // openBrowserCmd is platform-specific
 	err := cmd.Run()
 	if err != nil {
 		log.Printf("failed to open browser for %s: %v", url, err)
