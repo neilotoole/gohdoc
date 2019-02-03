@@ -32,26 +32,28 @@ func cmdOpen(app *App) error {
 }
 
 // processCmdOpenArgs processes the command line args.
-//
-// There are several possibilities for args passed to the program
-// - no args                     = gohdoc .
-// - gohdoc .                    = gohdoc CWD
-// - gohdoc some/relative/path   = transformed to absolute path
-// - gohdoc arbitrary/pkg        = try relative path first, then search for arbitrary/pkg
-// - gohdoc /some/absolute/path  = passed through after path.Clean()
-// - gohdoc more than one arg    = error
-//
-// - gohdoc fmt#Println          = open fmt with #fragment
-// - gohdoc fmt/#Println         = same as above
-// - gohdoc #Func                = open current dir godoc with #fragment
-// - gohdoc ./#Func              = same as above
-// - gohdoc .#Func               = same as above
-func processCmdOpenArgs(app *App) (path string, pkg string, fragment *string) {
+// This function returns a suggested absolute file path, package name,
+// and fragment (which may be empty). If the arg is relative, a
+// suggested absolute path is constructed by joining with app.cwd.
+
+func processCmdOpenArgs(app *App) (path, pkg, fragment string) {
+	// There are several possibilities for args passed to the program
+	// - no args                     = gohdoc .
+	// - gohdoc .                    = gohdoc CWD
+	// - gohdoc some/relative/path   = transformed to absolute path
+	// - gohdoc arbitrary/pkg        = try relative path first, then search for arbitrary/pkg
+	// - gohdoc /some/absolute/path  = passed through after path.Clean()
+	//
+	// - gohdoc fmt#Println          = open fmt with #fragment
+	// - gohdoc fmt/#Println         = same as above
+	// - gohdoc #Func                = open current dir godoc with #fragment
+	// - gohdoc ./#Func              = same as above
+	// - gohdoc .#Func               = same as above
 
 	cwd := filepath.Clean(app.cwd)
 	cwdBase := filepath.Base(cwd)
-	if len(app.args) == 0 || app.args[0] == "" {
-		return app.cwd, cwdBase, nil
+	if len(app.args) == 0 || strings.TrimSpace(app.args[0]) == "" {
+		return app.cwd, cwdBase, ""
 	}
 
 	raw := app.args[0]
@@ -60,20 +62,14 @@ func processCmdOpenArgs(app *App) (path string, pkg string, fragment *string) {
 	if i := strings.IndexRune(arg, '#'); i >= 0 {
 		if len(arg) == 1 {
 			// i.e. arg is "#"
-			return cwd, cwdBase, nil
+			return cwd, cwdBase, ""
 		}
 
 		if i < len(arg)-2 {
-			// e.g. arg is "blah#"
 			frag := arg[i+1:]
-			fragment = &frag
+			fragment = frag
 		}
-
-		if i > 0 {
-			arg = arg[0:i]
-		} else {
-			arg = ""
-		}
+		arg = arg[0:i]
 	}
 
 	arg = filepath.Clean(arg)
@@ -81,14 +77,11 @@ func processCmdOpenArgs(app *App) (path string, pkg string, fragment *string) {
 		return cwd, cwdBase, fragment
 	}
 
-	base := filepath.Base(arg)
 	if filepath.IsAbs(arg) {
-		return arg, base, fragment
+		return arg, filepath.Base(arg), fragment
 	}
 
-	// arg is not absolute
 	return filepath.Join(cwd, arg), arg, fragment
-
 }
 
 // doOpen does the main work of cmdOpen.
