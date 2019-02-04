@@ -178,7 +178,6 @@ func processCmdOpenArgs(app *App) (pkgpath, pkg, fragment string) {
 // Also, too lazy to set project up to use platform-specific tests.
 func cleanFilePath(p string) string {
 	p = path.Clean(p)
-
 	i := strings.IndexRune(p, ':')
 	if i >= 1 {
 		p = p[i+1:]

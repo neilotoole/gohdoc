@@ -7,9 +7,10 @@ gohdoc opens a package's godoc in the browser.
 ## Overview
 
 In your Go package, execute `gohdoc .` (or just `gohdoc`). This will open the current package's
-godoc in the browser. You can also specify absolute and relative paths, or full or partial
-package names, e.g. `gohdoc fmt` or `gohdoc encoding/jso`. Fragments are preserved, so
-`gohdoc fmt#Println` will work.
+godoc in the browser, starting a godoc http server if necessary. You can  specify absolute and
+relative paths, or full or partial package names, e.g. `gohdoc fmt` or `gohdoc encoding/jso`.
+Fragments are preserved, so`gohdoc fmt#Println` will work. Use `gohdoc -search` or `gohdoc -list`
+interrogate the set of packages on the godoc server.
 
 ## Install
 
@@ -72,7 +73,6 @@ Note that a godoc http server is tied to a particular GOPATH. If your pkg is
 unexpectedly not found, verify that the godoc http server is started on the
 correct GOPATH. If necessary, use gohdoc -killall and rerun gohdoc inside the
 appropriate GOPATH.
-
 ```
 
 

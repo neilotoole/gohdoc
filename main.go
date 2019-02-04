@@ -154,7 +154,6 @@ func newDefaultApp() *App {
 
 // initApp initializes an App.
 func initApp(app *App) error {
-
 	flag.BoolVar(&app.flagHelp, "help", false, "print help")
 	flag.BoolVar(&app.flagList, "list", false, "list all pkgs from godoc http server")
 	flag.BoolVar(&app.flagListv, "listv", false, "like -list but with verbose output")

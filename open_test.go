@@ -6,7 +6,6 @@ import (
 )
 
 func TestCleanFilePath(t *testing.T) {
-
 	testCases := []struct {
 		path string
 		want string
@@ -30,7 +29,6 @@ func TestCleanFilePath(t *testing.T) {
 			}
 		})
 	}
-
 }
 
 func TestProcessCmdOpenArgs(t *testing.T) {
