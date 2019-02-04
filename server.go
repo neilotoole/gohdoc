@@ -131,32 +131,30 @@ func listServerProcesses(ctx context.Context) ([]processMeta, error) {
 	return matches, nil
 }
 
-// ensureServer checks if there's an existing godoc http server, or starts one if
-// not. If ensureServer returns without an error, app.serverPkgPageBody will have
+// requireServer checks if there's an existing godoc http server, or starts one if
+// not. If requireServer returns without an error, app.serverPkgPageBody will have
 // been set to the contents of the godoc http server's /pkg page.
-func ensureServer(app *App) (err error) {
+func requireServer(app *App) (err error) {
 	if len(app.serverPkgPageBody) > 0 {
 		// If this is already set, then we've already determined that a server exists.
 		return nil
 	}
 
 	serverExisted := false
-
 	pingURL := fmt.Sprintf("http://localhost:%d/pkg", app.port)
 
 	resp, err := http.Get(pingURL)
 	if err != nil {
 		log.Printf("apparently there's no existing godoc http server at %s: %v", pingURL, err)
-		serverExisted = false
 	} else if resp.StatusCode == http.StatusOK {
 		serverExisted = true
 		log.Println("found existing godoc server at", pingURL)
+
 		defer resp.Body.Close()
-		b, err := ioutil.ReadAll(resp.Body)
+		app.serverPkgPageBody, err = ioutil.ReadAll(resp.Body)
 		if err != nil {
 			return fmt.Errorf("failed to read body from %s: %v", pingURL, err)
 		}
-		app.serverPkgPageBody = b
 	}
 
 	if !serverExisted {
@@ -232,9 +230,8 @@ func startServer(app *App) error {
 	// If the cmd started successfully, assign it to the app.
 	app.cmd = cmd
 
-	fmt.Printf("Started godoc server [%d] for GOPATH %s at http://localhost:%d\n", cmd.Process.Pid, app.gopath, app.port)
-	fmt.Printf("Server will continue to run in the background. Kill with: gohdoc -killall\n\n")
+	log.Printf("Started godoc server [%d] at http://localhost:%d\n", cmd.Process.Pid, app.port)
+	log.Printf("Server will continue to run in the background. Kill with: gohdoc -killall\n\n")
 
 	return nil
-
 }

@@ -1,11 +1,9 @@
-// Package main is the gohdoc implementation.
 package main
 
 import (
 	"context"
 	"flag"
 	"fmt"
-	"go/build"
 	"io/ioutil"
 	"log"
 	"os"
@@ -25,6 +23,10 @@ func main() {
 	switch {
 	case app.flagHelp:
 		cmdHelp()
+		return
+	case app.flagVersion:
+		cmdVersion()
+		return
 	case app.flagServers:
 		err = cmdServers(app)
 	case app.flagKillAll:
@@ -45,40 +47,65 @@ const (
 	// default godoc http server port (6060).
 	envGodocPort = "GODOC_HTTP_PORT"
 	version      = "0.1"
+	helpText     = `gohdoc opens a package's godoc in the browser.
 
-	helpText = `gohdoc (go http doc) opens godoc for a pkg in the browser. gohdoc looks for an existing
-godoc http server, and uses that if available. If not, gohdoc will start a godoc http
-server on port 6060 (port can be overridden using envar GODOC_HTTP_PORT). The godoc http
-server will continue to run after gohdoc exits, but can be killed using gohdoc -killall.
+gohdoc (go http doc) looks for an existing godoc http server, and uses that if
+available. If not, gohdoc will start a godoc http server on port 6060; override
+with envar GODOC_HTTP_PORT. The godoc http server will continue to run after
+gohdoc exits, but can be killed using gohdoc -killall.
+
 
 Usage:
 
-  gohdoc                                       open godoc in browser for current pkg
-  gohdoc .                                     same as above
-  gohdoc my/sub/pkg                            open godoc in browser for pkg at relative path
-  gohdoc ~/go/src/github.com/ksoze/myproj      open godoc in browser for pkg at this path
-  gohdoc fmt                                   open godoc in browser for pkg fmt
-  gohdoc -help                                 print this help message
-  gohdoc -servers                              list godoc http server processes
-  gohdoc -killall                              kill all godoc http server processes
-  gohdoc -list                                 list all packages on the godoc http server
-  gohdoc -listv                                same as -list, but prints additional detail
-  gohdoc -search pkg/name                      list packages that match arg
-  gohdoc -searchv pkg/name                     same as -search, but prints additional detail
+  gohdoc                                   open current pkg godoc in browser
+  gohdoc .                                 same as above
+  gohdoc my/sub/pkg                            
+  gohdoc /go/src/github.com/my/pkg      
+  gohdoc fmt                                   
+  gohdoc fmt#Println                       open fmt#Println godoc
+  gohdoc #MyFunc                           open current pkg #MyFunc godoc
+
+
+Interrogate the godoc server's package list:
+
+  gohdoc -list                             list all packages on the godoc http server
+  gohdoc -listv                            same as -list, but also print pkg url
+  gohdoc -search pkg/name                  list packages that match arg
+  gohdoc -searchv pkg/name                 same as -search, but also print pkg url
+
+
+List or kill running godoc servers:
+
+  gohdoc -servers                          list godoc http server processes
+  gohdoc -killall                          kill all godoc http server processes
+
+
+For completeness:
+
+  gohdoc -help                             print this help message
+  gohdoc -version                          print gohdoc version
 
 
 The -debug flag can be used to enable debug logging. If gohdoc spawns a godoc
 http server, the -debug flag will also print that server's verbose output.
 
-Note that the godoc http server is tied to a particular GOPATH. If your pkg is not
-found, verify that the godoc http server is using the correct GOPATH. If necessary,
-use gohdoc -killall and rerun gohdoc inside the appropriate GOPATH.`
+Note that a godoc http server is tied to a particular GOPATH. If your pkg is
+unexpectedly not found, verify that the godoc http server is started on the
+correct GOPATH. If necessary, use gohdoc -killall and rerun gohdoc inside the
+appropriate GOPATH.
+
+Feedback, bug reports etc to https://github.com/neilotoole/gohdoc
+gohdoc was created by Neil O'Toole and is released under the MIT License.
+`
 )
 
 // cmdHelp prints help.
 func cmdHelp() {
-	fmt.Printf("gohdoc %s - https://github.com/neilotoole/gohdoc\n\n", version)
 	fmt.Println(helpText)
+}
+
+func cmdVersion() {
+	fmt.Printf("gohdoc v%s\n", version)
 }
 
 // App holds program state.
@@ -86,8 +113,7 @@ type App struct {
 	// port is the port to start a godoc http server on, if necessary to do so. Defaults
 	// to 6060, but can be overridden by envar GODOC_HTTP_PORT.
 	port int
-	// gopath is the calculated value of GOPATH.
-	gopath string
+
 	// cwd is the current working directory
 	cwd string
 	// cmd is the Cmd used to start a godoc http server, if necessary to do so.
@@ -99,27 +125,24 @@ type App struct {
 	serverPkgList []string
 
 	flagHelp    bool
+	flagVersion bool
 	flagList    bool
 	flagListv   bool
 	flagSearch  bool
 	flagSearchv bool
 	flagServers bool
 	flagKillAll bool
-	flagDebug   bool
+
+	flagDebug bool
 
 	// args holds the processed value of flag.Args after flag.Parse is invoked.
-	// Each element of args will have whitespace trimmed and have min length of 1.
+	// Each element of args will have whitespace trimmed.
 	args []string
 }
 
 // newDefaultApp returns a default App instance.
 func newDefaultApp() *App {
 	app := &App{port: 6060, ctx: context.Background()}
-
-	app.gopath = os.Getenv("GOPATH")
-	if app.gopath == "" {
-		app.gopath = build.Default.GOPATH
-	}
 
 	var err error
 	app.cwd, err = os.Getwd()
@@ -140,12 +163,13 @@ func initApp(app *App) error {
 	flag.BoolVar(&app.flagServers, "servers", false, "list all godoc http server processes")
 	flag.BoolVar(&app.flagKillAll, "killall", false, "kill all godoc http server processes")
 	flag.BoolVar(&app.flagDebug, "debug", false, "print debug messages")
+	flag.BoolVar(&app.flagVersion, "version", false, "print gohdoc version")
 
 	flag.Parse()
 
 	for _, arg := range flag.Args() {
 		// Process command line args.
-		// Each element of app.args will have whitespace trimmed and have min length of 1.
+		// Each element of app.args will have whitespace trimmed (and no empty strings).
 		arg = strings.TrimSpace(arg)
 		if len(arg) > 0 {
 			app.args = append(app.args, arg)
@@ -157,8 +181,6 @@ func initApp(app *App) error {
 	} else {
 		log.SetFlags(log.Ltime | log.Lshortfile)
 	}
-
-	log.Println("using GOPATH:", app.gopath)
 
 	envPortVal, ok := os.LookupEnv(envGodocPort)
 	if ok {

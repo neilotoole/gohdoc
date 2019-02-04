@@ -5,7 +5,7 @@ import (
 	"log"
 	"net/http"
 	"path"
-	"path/filepath"
+	"strconv"
 	"strings"
 	"time"
 )
@@ -14,11 +14,11 @@ import (
 func cmdOpen(app *App) error {
 
 	if len(app.args) > 1 {
-		return fmt.Errorf("must supply maximum one arg to gohdoc, but received %d [%s]",
-			len(app.args), strings.Join(app.args, ","))
+		return fmt.Errorf("must supply maximum one arg to gohdoc, but received %d: [%s]",
+			len(app.args), strings.Join(app.args, " "))
 	}
 
-	err := ensureServer(app)
+	err := requireServer(app)
 	if err != nil {
 		return err
 	}
@@ -27,17 +27,104 @@ func cmdOpen(app *App) error {
 		return err
 	}
 	// At this point, we know that the server is available, and app.serverPkgList is populated.
-	return doOpen(app, openBrowser)
+	return doCmdOpen(app, openBrowser)
+}
 
+type openBrowserFunc func(app *App, url string) error
+
+// doCmdOpen does the main work of cmdOpen.
+func doCmdOpen(app *App, fnOpenBrowser openBrowserFunc) error {
+	pth, pkg, fragment := processCmdOpenArgs(app)
+
+	// Try the path-based approach first.
+
+	// pth looks something like /go/src/github.com/neilotoole/gohdoc
+	// We'll iteratively look for a package that matches the path, trimming
+	// a front segment each time. That is, we'll search for:
+	//
+	//   go/src/github.com/neilotoole/gohdoc
+	//   src/github.com/neilotoole/gohdoc
+	//   github.com/neilotoole/gohdoc
+	//   neilotoole/gohdoc
+	//   gohdoc
+
+	// strip the leading slash, we don't need it
+	pth = strings.TrimPrefix(pth, "/")
+
+	parts := strings.Split(pth, "/")
+	for {
+		// reconstruct the path
+		findPkg := strings.Join(parts, "/")
+		log.Println("checking if pkg is listed:", findPkg)
+
+		for _, serverPkg := range app.serverPkgList {
+			if findPkg == serverPkg {
+				log.Println("found in pkg list:", serverPkg)
+				ok, err := serverPkgPageOK(app, serverPkg, true)
+				if err != nil {
+					return err
+				}
+				if !ok {
+					return fmt.Errorf("should have been able to open pkg, but it seems not to exist: %s",
+						serverPkg)
+				}
+
+				url := absPkgURL(app, serverPkg, fragment)
+				return fnOpenBrowser(app, url)
+			}
+		}
+
+		if len(parts) == 1 {
+			break
+		}
+
+		parts = parts[1:]
+	}
+
+	// We weren't able to match the path (or subsections of it) against
+	// serverPkgList, so we'll search for the pkg term.
+	// When we get this far, we could be searching for partial
+	// names like "byt", or "encoding/jso".
+	matches, exactMatch := getPkgMatches(app.serverPkgList, pkg)
+	if exactMatch {
+		// If we've got an exact match, we only want to open that page
+		ok, err := serverPkgPageOK(app, matches[0], true)
+		if err != nil {
+			return err
+		}
+		if !ok {
+			// shouldn't happen
+			return fmt.Errorf("should have been able to open this, but it seems not to exist: %s", matches[0])
+		}
+
+		return fnOpenBrowser(app, absPkgURL(app, matches[0], fragment))
+	}
+
+	// We don't have an exact match, so we'll iterate over the set of
+	// possible matches and check if we can open that page.
+	for _, match := range matches {
+		ok, err := serverPkgPageOK(app, match, false)
+		if err != nil {
+			return err
+		}
+		if ok {
+			err = fnOpenBrowser(app, absPkgURL(app, match, fragment))
+			printPossibleMatches(app, pkg, matches)
+			return err
+		}
+	}
+
+	return fmt.Errorf("failed to find in server pkg list: %s", pkg)
 }
 
 // processCmdOpenArgs processes the command line args.
-// This function returns a suggested absolute file path, package name,
+// This function returns a suggested absolute path, package name,
 // and fragment (which may be empty). If the arg is relative, a
 // suggested absolute path is constructed by joining with app.cwd.
-
-func processCmdOpenArgs(app *App) (path, pkg, fragment string) {
-	// There are several possibilities for args passed to the program
+// The returned path will always use forward slash (thus on Windows, the
+// returned path is not a valid path).
+func processCmdOpenArgs(app *App) (pkgpath, pkg, fragment string) {
+	// There are several possibilities for args passed to the program, such as:
 	// - no args                     = gohdoc .
 	// - gohdoc .                    = gohdoc CWD
 	// - gohdoc some/relative/path   = transformed to absolute path
@@ -50,14 +137,15 @@ func processCmdOpenArgs(app *App) (path, pkg, fragment string) {
 	// - gohdoc ./#Func              = same as above
 	// - gohdoc .#Func               = same as above
 
-	cwd := filepath.Clean(app.cwd)
-	cwdBase := filepath.Base(cwd)
+	cwd := cleanFilePath(app.cwd)
+	cwdBase := path.Base(cwd)
+
 	if len(app.args) == 0 || strings.TrimSpace(app.args[0]) == "" {
-		return app.cwd, cwdBase, ""
+		return cwd, cwdBase, ""
 	}
 
-	raw := app.args[0]
-	arg := strings.TrimSpace(raw)
+	arg := strings.TrimSpace(app.args[0])
+	arg = cleanFilePath(arg)
 
 	if i := strings.IndexRune(arg, '#'); i >= 0 {
 		if len(arg) == 1 {
@@ -72,108 +160,33 @@ func processCmdOpenArgs(app *App) (path, pkg, fragment string) {
 		arg = arg[0:i]
 	}
 
-	arg = filepath.Clean(arg)
+	arg = path.Clean(arg)
 	if arg == "." {
 		return cwd, cwdBase, fragment
 	}
 
-	if filepath.IsAbs(arg) {
-		return arg, filepath.Base(arg), fragment
+	if path.IsAbs(arg) {
+		return arg, path.Base(arg), fragment
 	}
 
-	return filepath.Join(cwd, arg), arg, fragment
+	return path.Join(cwd, arg), arg, fragment
 }
 
-// doOpen does the main work of cmdOpen.
-func doOpen(app *App, fnOpenBrowser func(app *App, url string) error) error {
+// cleanFilePath strips any Windows volume name and converts
+// to forward slash. This isn't particularly robust, but being
+// that we don't need an actual working path, it should suffice.
+// Also, too lazy to set project up to use platform-specific tests.
+func cleanFilePath(p string) string {
+	p = path.Clean(p)
 
-	var arg string
-	var originalArg *string
-	var fragment *string
-
-	if len(app.args) == 0 || app.args[0] == "" {
-		// If no arg supplied, then assume current working directory
-		arg = app.cwd
-	} else {
-		arg = app.args[0]
-
-		if i := strings.IndexRune(arg, '#'); i >= 0 {
-			frag := arg[i:]
-			fragment = &frag
-			if i > 0 {
-				arg = arg[0 : i-1]
-			} else {
-				arg = ""
-			}
-		}
-
-		if arg == "." {
-			// Special case, we expand "." to cwd
-			arg = app.cwd
-		}
-		originalArg = &app.args[0]
+	i := strings.IndexRune(p, ':')
+	if i >= 1 {
+		p = p[i+1:]
 	}
 
-	log.Println("#fragment:", fragment)
-
-	tentativePkgPath := filepath.Clean(arg)
-	if !path.IsAbs(tentativePkgPath) {
-		tentativePkgPath = filepath.Join(app.cwd, tentativePkgPath)
-	}
-
-	log.Println("using tentativePkgPath:", tentativePkgPath)
-
-	// We know that the server is accessible, check that we can actually access our pkg page
-	pkgPath, tentativeOnGopath := determinePackageOnGopath(app.gopath, tentativePkgPath)
-	if tentativeOnGopath {
-		log.Println("attempting tentativePkgPath:", pkgPath)
-		ok, err := serverPkgPageOK(app, pkgPath, true)
-		if err != nil {
-			return err
-		}
-		if ok {
-			return fnOpenBrowser(app, absPkgURL(app, pkgPath, nil)) // TODO: #fragment
-		}
-
-		log.Println("server doesn't have pkgPath:", pkgPath)
-
-	}
-
-	if originalArg != nil && !filepath.IsAbs(arg) {
-		// If originalArg is absolute, then we've got no business searching for it
-
-		// But if we get this far, we could be searching for something like "fmt",
-		// or partial names like "byt", or "encoding/jso".
-		matches, exactMatch := getPkgMatches(app.serverPkgList, arg)
-		if exactMatch {
-			// If we've got an exact match, we only want to open that page
-			ok, err := serverPkgPageOK(app, matches[0], true)
-			if err != nil {
-				return err
-			}
-			if !ok {
-				// shouldn't happen
-				return fmt.Errorf("should have been able to open this, but it seems not to exist: %s", matches[0])
-			}
-
-			return fnOpenBrowser(app, absPkgURL(app, matches[0], nil)) // TODO: #fragment
-		}
-
-		// We don't have an exact match
-		for _, match := range matches {
-			ok, err := serverPkgPageOK(app, match, false)
-			if err != nil {
-				return err
-			}
-			if ok {
-				printPossibleMatches(app, arg, matches)
-				return fnOpenBrowser(app, absPkgURL(app, match, nil)) // TODO: #fragment
-			}
-		}
-
-	}
-
-	return fmt.Errorf("failed to find %s", arg)
+	p = strings.Replace(p, `\`, "/", -1)
+	p = path.Clean(p)
+	return p
 }
 
 func printPossibleMatches(app *App, arg string, matches []string) {
@@ -190,17 +203,16 @@ func printPossibleMatches(app *App, arg string, matches []string) {
 }
 
 // serverPkgPageOK returns true, nil if pkgPath exists on the server.
-// The pkgPath arg must be a well-formed pkg path, e.g. "bytes", "encoding/json",
+// The pkgPath arg should be a well-formed pkg path, e.g. "bytes", "encoding/json",
 // or "github.com/neilotoole/gohdoc".
 // An error is returned if a http failure occurs.
 func serverPkgPageOK(app *App, pkgPath string, retry bool) (ok bool, err error) {
-	log.Printf("serverPkgPageOK: pkgPath=%q\n", pkgPath)
 	if strings.HasPrefix(pkgPath, "/") || strings.HasSuffix(pkgPath, "/") {
 		return false, fmt.Errorf("invalid pkg path (has '/' prefix or suffix): %s", pkgPath)
 	}
 
-	pageURL := absPkgURL(app, pkgPath, nil)
-	log.Println("serverPkgPageOK: attempting pageURL:", pageURL)
+	pageURL := absPkgURL(app, pkgPath, "")
+	log.Println("verifying pkg page:", pageURL)
 	timeout := time.Now()
 	if retry {
 		timeout = time.Now().Add(time.Millisecond * 500)
@@ -231,7 +243,6 @@ func serverPkgPageOK(app *App, pkgPath string, retry bool) (ok bool, err error) 
 func openBrowser(app *App, url string) error {
 	log.Println("attempting to open a browser for:", url)
 
-	//cmd := newOpenBrowserCmd(app.ctx, url) // newOpenBrowserCmd is platform-specific
 	cmd := openBrowserCmd(app.ctx, url) // openBrowserCmd is platform-specific
 	err := cmd.Run()
 	if err != nil {
@@ -241,10 +252,39 @@ func openBrowser(app *App, url string) error {
 
 	if app.cmd != nil {
 		// if non-nil, we did start a server
-		fmt.Printf("Opening %s on GOPATH %s\n", url, app.gopath)
+		log.Printf("Opening %s on newly-started server\n", url)
 	} else {
-		fmt.Printf("Opening %s on already-existing server\n", url)
+		log.Printf("Opening %s on pre-existing server\n", url)
 	}
 
+	fmt.Println(url)
 	return nil
+}
+
+// absPkgURL returns the godoc http server URL for the supplied pkg.
+func absPkgURL(app *App, fullPkgPath string, fragment string) string {
+	if len(fragment) == 0 {
+		return fmt.Sprintf("http://localhost:%d/pkg/%s/", app.port, fullPkgPath)
+	}
+
+	if fragment[0] != '#' {
+		fragment = "#" + fragment
+	}
+
+	return fmt.Sprintf("http://localhost:%d/pkg/%s/%s", app.port, fullPkgPath, fragment)
+}
+
+// printPkgsWithLink will - for each pkg - print a line with the pkg name and link.
+func printPkgsWithLink(app *App, pkgs []string) {
+	var width int
+	for _, m := range pkgs {
+		if len(m) > width {
+			width = len(m)
+		}
+	}
+	tpl := "%-" + strconv.Itoa(width) + "s    %s\n"
+
+	for _, pkg := range pkgs {
+		fmt.Printf(tpl, pkg, absPkgURL(app, pkg, ""))
+	}
 }

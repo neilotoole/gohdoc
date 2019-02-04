@@ -10,12 +10,6 @@ import (
 	"os/exec"
 )
 
-//func init() {
-//	newOpenBrowserCmdFn = func(ctx context.Context, url string) *exec.Cmd {
-//		return exec.CommandContext(ctx, "xdg-open", url) // linux
-//	}
-//}
-
 func openBrowserCmd(ctx context.Context, url string) *exec.Cmd {
 	return exec.CommandContext(ctx, "xdg-open", url) // linux
 }

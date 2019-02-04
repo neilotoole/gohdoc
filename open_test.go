@@ -5,11 +5,43 @@ import (
 	"testing"
 )
 
+func TestCleanFilePath(t *testing.T) {
+
+	testCases := []struct {
+		path string
+		want string
+	}{
+		{path: "/go/src", want: "/go/src"},
+		{path: "/", want: "/"},
+		{path: "", want: "."},
+		{path: ".", want: "."},
+		{path: "go/src", want: "go/src"},
+		{path: `C:\go\src`, want: "/go/src"},
+		{path: `relative\pkg`, want: "relative/pkg"},
+		{path: `\\server\go\src`, want: "/server/go/src"},
+	}
+
+	for _, tc := range testCases {
+		tc := tc
+		t.Run(tc.path, func(t *testing.T) {
+			got := cleanFilePath(tc.path)
+			if got != tc.want {
+				t.Errorf("want %q but got %q", tc.want, got)
+			}
+		})
+	}
+
+}
+
 func TestProcessCmdOpenArgs(t *testing.T) {
-	const cwd = "/go/src/github.com/neilotoole/gohdoc"
+	const (
+		cwd    = "/go/src/github.com/neilotoole/gohdoc"
+		cwdWin = `C:\go\src\github.com\neilotoole\gohdoc`
+	)
 
 	testCases := []struct {
 		arg0     string
+		windows  bool
 		wantPath string
 		wantPkg  string
 		wantFrag string
@@ -40,11 +72,17 @@ func TestProcessCmdOpenArgs(t *testing.T) {
 		{arg0: "sub/pkg/.#Frag", wantPath: "/go/src/github.com/neilotoole/gohdoc/sub/pkg", wantPkg: "sub/pkg", wantFrag: "Frag"},
 		{arg0: "fmt", wantPath: "/go/src/github.com/neilotoole/gohdoc/fmt", wantPkg: "fmt"},
 		{arg0: "fmt#Println", wantPath: "/go/src/github.com/neilotoole/gohdoc/fmt", wantPkg: "fmt", wantFrag: "Println"},
+		{arg0: `C:\go\src\github.com/neilotoole/gohdoc`, windows: true, wantPath: "/go/src/github.com/neilotoole/gohdoc", wantPkg: "gohdoc"},
+		{arg0: `\\server\go\src\github.com/neilotoole/gohdoc`, windows: true, wantPath: "/server/go/src/github.com/neilotoole/gohdoc", wantPkg: "gohdoc"},
 	}
 
 	for i, tc := range testCases {
 		tc := tc
 		t.Run(fmt.Sprintf("%d__%s", i, tc.arg0), func(t *testing.T) {
+			cwd := cwd
+			if tc.windows {
+				cwd = cwdWin
+			}
 			app := &App{cwd: cwd, args: []string{tc.arg0}}
 
 			gotPath, gotPkg, gotFrag := processCmdOpenArgs(app)

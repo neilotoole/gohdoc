@@ -5,13 +5,6 @@ import (
 	"os/exec"
 )
 
-//
-//func init() {
-//	newOpenBrowserCmdFn = func(ctx context.Context, url string) *exec.Cmd {
-//		return exec.CommandContext(ctx, "open", url) // macOS
-//	}
-//}
-
 func openBrowserCmd(ctx context.Context, url string) *exec.Cmd {
 	return exec.CommandContext(ctx, "open", url) // macOS
 }
