@@ -10,11 +10,11 @@ In your Go package, execute `gohdoc .` (or just `gohdoc`). This will open the cu
 godoc in the browser, starting a godoc http server if necessary. You can  specify absolute and
 relative paths, or full or partial package names, e.g. `gohdoc fmt` or `gohdoc encoding/jso`.
 Fragments are preserved, so`gohdoc fmt#Println` will work. Use `gohdoc -search` or `gohdoc -list`
-interrogate the set of packages on the godoc server.
+to interrogate the set of packages on the godoc server.
 
 ## Install
 
-`gohdoc` is installed in the usual fashion:
+`gohdoc` is installed in the usual Go fashion:
 
 ```bash
 
