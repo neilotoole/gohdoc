@@ -46,7 +46,7 @@ const (
 	// envGodocPort is the envar used to override the
 	// default godoc http server port (6060).
 	envGodocPort = "GODOC_HTTP_PORT"
-	version      = "0.1.1"
+	version      = "0.1.2"
 	helpText     = `gohdoc opens a package's godoc in the browser.
 
 gohdoc (go http doc) looks for an existing godoc http server, and uses that if
