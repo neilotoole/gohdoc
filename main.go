@@ -46,7 +46,7 @@ const (
 	// envGodocPort is the envar used to override the
 	// default godoc http server port (6060).
 	envGodocPort = "GODOC_HTTP_PORT"
-	version      = "0.1.3"
+	version      = "1.0.0"
 	helpText     = `gohdoc opens a package's godoc in the browser.
 
 gohdoc (go http doc) looks for an existing godoc http server, and uses that if
@@ -96,12 +96,13 @@ appropriate GOPATH.
 
 Feedback, bug reports etc to https://github.com/neilotoole/gohdoc
 gohdoc was created by Neil O'Toole and is released under the MIT License.
+
 `
 )
 
 // cmdHelp prints help.
 func cmdHelp() {
-	fmt.Println(helpText)
+	fmt.Printf(helpText)
 }
 
 func cmdVersion() {

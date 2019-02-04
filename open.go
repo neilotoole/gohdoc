@@ -27,13 +27,11 @@ func cmdOpen(app *App) error {
 		return err
 	}
 	// At this point, we know that the server is available, and app.serverPkgList is populated.
-	return doCmdOpen(app, openBrowser)
+	return doCmdOpen(app)
 }
 
-type openBrowserFunc func(app *App, url string) error
-
 // doCmdOpen does the main work of cmdOpen.
-func doCmdOpen(app *App, fnOpenBrowser openBrowserFunc) error {
+func doCmdOpen(app *App) error {
 	pth, pkg, fragment := processCmdOpenArgs(app)
 
 	// Try the path-based approach first.
@@ -70,7 +68,7 @@ func doCmdOpen(app *App, fnOpenBrowser openBrowserFunc) error {
 				}
 
 				url := absPkgURL(app, serverPkg, fragment)
-				return fnOpenBrowser(app, url)
+				return openBrowser(app, url)
 			}
 		}
 
@@ -97,7 +95,7 @@ func doCmdOpen(app *App, fnOpenBrowser openBrowserFunc) error {
 			return fmt.Errorf("should have been able to open this, but it seems not to exist: %s", matches[0])
 		}
 
-		return fnOpenBrowser(app, absPkgURL(app, matches[0], fragment))
+		return openBrowser(app, absPkgURL(app, matches[0], fragment))
 	}
 
 	// We don't have an exact match, so we'll iterate over the set of
@@ -108,7 +106,7 @@ func doCmdOpen(app *App, fnOpenBrowser openBrowserFunc) error {
 			return err
 		}
 		if ok {
-			err = fnOpenBrowser(app, absPkgURL(app, match, fragment))
+			err = openBrowser(app, absPkgURL(app, match, fragment))
 			printPossibleMatches(app, pkg, matches)
 			return err
 		}
@@ -262,15 +260,14 @@ func openBrowser(app *App, url string) error {
 
 // absPkgURL returns the godoc http server URL for the supplied pkg.
 func absPkgURL(app *App, fullPkgPath string, fragment string) string {
+
+	fullPkgPath = strings.TrimPrefix(fullPkgPath, "/")
+	fragment = strings.TrimSuffix(fragment, "#")
 	if len(fragment) == 0 {
 		return fmt.Sprintf("http://localhost:%d/pkg/%s/", app.port, fullPkgPath)
 	}
 
-	if fragment[0] != '#' {
-		fragment = "#" + fragment
-	}
-
-	return fmt.Sprintf("http://localhost:%d/pkg/%s/%s", app.port, fullPkgPath, fragment)
+	return fmt.Sprintf("http://localhost:%d/pkg/%s/#%s", app.port, fullPkgPath, fragment)
 }
 
 // printPkgsWithLink will - for each pkg - print a line with the pkg name and link.
