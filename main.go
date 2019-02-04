@@ -168,7 +168,7 @@ func initApp(app *App) error {
 
 	for _, arg := range flag.Args() {
 		// Process command line args.
-		// Each element of app.args will have whitespace trimmed (and no empty strings).
+		// app.args has no empty elements, and each element has whitespace trimmed.
 		arg = strings.TrimSpace(arg)
 		if len(arg) > 0 {
 			app.args = append(app.args, arg)
@@ -200,8 +200,8 @@ func initApp(app *App) error {
 		stop := make(chan os.Signal, 1)
 		signal.Notify(stop, os.Interrupt)
 
-		<-stop
-		log.Println("received interrupt/kill signal")
+		sig := <-stop
+		log.Println("received interrupt/kill signal:", sig)
 		cancelFn()
 		if app.cmd != nil {
 			_ = app.cmd.Process.Kill()

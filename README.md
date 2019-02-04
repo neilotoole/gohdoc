@@ -1,15 +1,15 @@
 # gohdoc
 
-gohdoc opens a package's godoc in the browser.
+`gohdoc` opens a package's godoc in the browser.
 
 [![Go Report Card](https://goreportcard.com/badge/github.com/neilotoole/gohdoc)](https://goreportcard.com/report/github.com/neilotoole/gohdoc)
 
 ## Overview
 
-In your Go package, execute `gohdoc .` (or just `gohdoc`). This will open the current package's
+In your package dir, execute `gohdoc .` (or just `gohdoc`). This will open the current package's
 godoc in the browser, starting a godoc http server if necessary. You can  specify absolute and
 relative paths, or full or partial package names, e.g. `gohdoc fmt` or `gohdoc encoding/jso`.
-Fragments are preserved, so`gohdoc fmt#Println` will work. Use `gohdoc -search` or `gohdoc -list`
+Fragments are preserved, so `gohdoc fmt#Println` will work. Use `gohdoc -search` or `gohdoc -list`
 to interrogate the set of packages on the godoc server.
 
 ## Install
