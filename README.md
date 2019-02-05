@@ -12,6 +12,11 @@ relative paths, or full or partial package names, e.g. `gohdoc fmt` or `gohdoc e
 Fragments are preserved, so `gohdoc fmt#Println` will work. Use `gohdoc -search` or `gohdoc -list`
 to interrogate the set of packages on the godoc server.
 
+### Why?
+The original purpose was to swiftly verify that the godoc I was writing for my package
+was properly formatted in godoc's HTML rendering. But then I also found it useful for
+generically opening godoc in the browser.
+
 ## Install
 
 `gohdoc` is installed in the usual Go fashion:
@@ -24,7 +29,7 @@ $ go get -u github.com/neilotoole/gohdoc
 
 ## Usage
 
-Use `gohdoc -help` to see this:
+Use `gohdoc -help` to see someing like this:
 
 ```
 gohdoc opens a package's godoc in the browser.
@@ -43,7 +48,8 @@ Usage:
   gohdoc /go/src/github.com/my/pkg      
   gohdoc fmt                                   
   gohdoc fmt#Println                       open fmt#Println godoc
-  gohdoc #MyFunc                           open current pkg #MyFunc godoc
+  gohdoc .#MyFunc                          open current pkg #MyFunc godoc
+  gohodc '#MyFunc'                         same as above
 
 
 Interrogate the godoc server's package list:
@@ -75,4 +81,7 @@ correct GOPATH. If necessary, use gohdoc -killall and rerun gohdoc inside the
 appropriate GOPATH.
 ```
 
+## Feedback
 
+Bugs, feature requests etc, open an [issue](https://github.com/neilotoole/gohdoc/issues).
+Make sure to run `gohdoc` with the `-debug` flag and include the output in the issue.

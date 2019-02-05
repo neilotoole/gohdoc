@@ -119,6 +119,9 @@ type App struct {
 	cwd string
 	// cmd is the Cmd used to start a godoc http server, if necessary to do so.
 	cmd *exec.Cmd
+	// ctx is the program's shared context. Best practice is generally that the
+	// context should be passed as the first param to functions that need it, but
+	// for this trivial app, it's fine as a field.
 	ctx context.Context
 	// serverPkgPageBody holds the contents of the godoc http server's /pkg/ page
 	serverPkgPageBody []byte

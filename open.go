@@ -1,6 +1,7 @@
 package main
 
 import (
+	"context"
 	"fmt"
 	"log"
 	"net/http"
@@ -57,14 +58,15 @@ func doCmdOpen(app *App) error {
 
 		for _, serverPkg := range app.serverPkgList {
 			if findPkg == serverPkg {
-				log.Println("found in pkg list:", serverPkg)
+				log.Println("found in pkg list, will attempt to verify page on server:", serverPkg)
+
 				ok, err := serverPkgPageOK(app, serverPkg, true)
 				if err != nil {
 					return err
 				}
 				if !ok {
-					return fmt.Errorf("should have been able to open pkg, but it seems not to exist: %s",
-						serverPkg)
+					return fmt.Errorf("should have been able to open pkg page %s but failed: %v",
+						serverPkg, err)
 				}
 
 				url := absPkgURL(app, serverPkg, fragment)
@@ -86,7 +88,7 @@ func doCmdOpen(app *App) error {
 	matches, exactMatch := getPkgMatches(app.serverPkgList, pkg)
 	if exactMatch {
 		// If we've got an exact match, we only want to open that page
-		ok, err := serverPkgPageOK(app, matches[0], true)
+		ok, err := serverPkgPageOK(app, matches[0], false)
 		if err != nil {
 			return err
 		}
@@ -209,23 +211,33 @@ func serverPkgPageOK(app *App, pkgPath string, retry bool) (ok bool, err error) 
 	}
 
 	pageURL := absPkgURL(app, pkgPath, "")
-	log.Println("verifying pkg page:", pageURL)
-	timeout := time.Now()
+
+	ctx := app.ctx
 	if retry {
-		timeout = time.Now().Add(time.Millisecond * 500)
+		var cancel context.CancelFunc
+		ctx, cancel = context.WithTimeout(ctx, time.Millisecond*500)
+		defer cancel()
 	}
+
+	doneCh := ctx.Done()
+
 	var resp *http.Response
+	i := 1
 	for {
+		log.Printf("verifying pkg page (attempt %d): %s\n", i, pageURL)
+		select {
+		case <-doneCh:
+			return false, ctx.Err()
+		default:
+		}
 
 		resp, err = http.Head(pageURL)
 		if err == nil && resp.StatusCode == http.StatusOK {
 			return true, nil
 		}
 
-		if !retry || time.Now().After(timeout) {
-			break
-		}
 		time.Sleep(time.Millisecond * 100)
+		i++
 	}
 
 	if err != nil {
