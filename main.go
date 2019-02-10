@@ -46,7 +46,7 @@ const (
 	// envGodocPort is the envar used to override the
 	// default godoc http server port (6060).
 	envGodocPort = "GODOC_HTTP_PORT"
-	version      = "1.0.0"
+	version      = "1.0.1"
 	helpText     = `gohdoc opens a package's godoc in the browser.
 
 gohdoc (go http doc) looks for an existing godoc http server, and uses that if
@@ -63,7 +63,8 @@ Usage:
   gohdoc /go/src/github.com/my/pkg      
   gohdoc fmt                                   
   gohdoc fmt#Println                       open fmt#Println godoc
-  gohdoc #MyFunc                           open current pkg #MyFunc godoc
+  gohdoc .#MyFunc                          open current pkg #MyFunc godoc
+  gohodc '#MyFunc'                         same as above, quoted because bash
 
 
 Interrogate the godoc server's package list:

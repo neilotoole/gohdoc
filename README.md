@@ -49,7 +49,7 @@ Usage:
   gohdoc fmt                                   
   gohdoc fmt#Println                       open fmt#Println godoc
   gohdoc .#MyFunc                          open current pkg #MyFunc godoc
-  gohodc '#MyFunc'                         same as above
+  gohodc '#MyFunc'                         same as above, quoted because bash
 
 
 Interrogate the godoc server's package list:
