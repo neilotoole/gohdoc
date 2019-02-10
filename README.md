@@ -4,6 +4,11 @@
 
 [![Go Report Card](https://goreportcard.com/badge/github.com/neilotoole/gohdoc)](https://goreportcard.com/report/github.com/neilotoole/gohdoc)
 
+## Why?
+
+To verify that your package's godoc is formatted correctly in the browser.
+Or because you prefer to view godoc in the browser.
+
 ## Overview
 
 In your package dir, execute `gohdoc .` (or just `gohdoc`). This will open the current package's
