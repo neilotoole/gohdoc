@@ -34,7 +34,7 @@ $ go get -u github.com/neilotoole/gohdoc
 
 ## Usage
 
-Use `gohdoc -help` to see someing like this:
+Use `gohdoc -help` to see something like this:
 
 ```
 gohdoc opens a package's godoc in the browser.
