@@ -1,8 +1,13 @@
+[![Go Report Card](https://goreportcard.com/badge/github.com/neilotoole/gohdoc)](https://goreportcard.com/report/github.com/neilotoole/gohdoc)
+
 # gohdoc
 
 `gohdoc` opens a package's godoc in the browser.
 
-[![Go Report Card](https://goreportcard.com/badge/github.com/neilotoole/gohdoc)](https://goreportcard.com/report/github.com/neilotoole/gohdoc)
+> **Note**
+> `gohdoc` hasn't been updated in years, and the Go toolchain has moved forward significantly. In particular,
+> `gohdoc` doesn't take account of Go modules, which means it really doesn't work as desired any more.
+> I doubt that updating `gohdoc` will any time soon be my highest open-source priority. Sorry, `gohdoc`.
 
 ## Why?
 
