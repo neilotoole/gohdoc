@@ -5,8 +5,8 @@
 `gohdoc` opens a package's godoc in the browser.
 
 > **Note**
-> `gohdoc` hasn't been updated in years, and the Go toolchain has moved forward significantly. In particular,
-> `gohdoc` doesn't take account of Go modules, which means it really doesn't work as desired any more.
+> `gohdoc` hasn't been updated in years, and the Go toolchain has since moved forward significantly. In particular,
+> `gohdoc` doesn't take account of [Go modules](https://go.dev/blog/using-go-modules), which means it really doesn't work as desired any more.
 > I doubt that updating `gohdoc` will any time soon be my highest open-source priority. Sorry, `gohdoc`.
 
 ## Why?
